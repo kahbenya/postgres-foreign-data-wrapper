@@ -254,4 +254,4 @@ After all the configurations are properly done query the foreign table
   ```sql
     ALTER SERVER  informix_tcp OPTIONS (set client_locale 'en_US.819');
   ```
-[rocky9]: (https://www.ibm.com/support/pages/informix-client-software-development-kit-client-sdk-and-informix-connect-system-requirements#linux : )
+[rocky9]: https://www.ibm.com/support/pages/informix-client-software-development-kit-client-sdk-and-informix-connect-system-requirements#linux
