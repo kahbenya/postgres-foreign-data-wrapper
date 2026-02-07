@@ -7,150 +7,126 @@ Using <https://github.com/credativ/informix_fdw>
 
 # PostgreSQL
 
-PostgreSQL 15 was used for testing. This version worked even though the last stated
+PostgreSQL 16 used for testing. This version worked even though the last stated
 supported version of `informix_fdw` is PostgreSQL 13.
 
 # IBM Client SDK Setup
 
+## Prerequisites
+
+* Java Runtime
+
+```shell
+# sudo dnf install java-21-openjdk
+```
+
 ## Compatibility
 
-Works on CentOS 7 not on Rocky 8 (RHEL8) due to version of ncurses library needed.
-Needs libncurses.5 provides EPL libncurses.6.
+SDK: IBM Informix Client-SDK 4.50.FC12W5 Linux x86 64 bit (ibm.csdk.4.50.12.5.Linux.64.x86_64.tar)
 
-> what doesnt work
-> i think it is the setup of the Informix Client SDK
+[Workaround for Rocky 9][rocky9] based on Informix version
 
-> **NOTE**: An IBM account is needed to download the Client SDK.
+```
+[The] following system libraries are needed for IBM Informix version 14.10.FC9,
+14.10.FC10, and 14.10.FC11 to run on Red Hat Linux 9. (This workaround is not
+needed in 14.10.FC11W1 and later). Higher versions of same libraries are
+installed on Red Hat Linux 9. As a workaround, symbolic links to those
+libraries need to be created.
+
+      Libraries needed for Informix:
+          libncurses.so.5
+          libtinfo.so.5
+
+      Libraries installed on Red Hat Linux 9:
+         libncurses.so.6
+         libtinfo.so.6
+
+      Workaround:
+          Run following commands as root user from /usr/lib64 directory.
+               ln -s libncurses.so.6 libncurses.so.5
+
+               ln -s libtinfo.so.6 libtinfo.so.5
+```
+
+**NOTE**: An IBM account is needed to download the Client SDK.
 
 ## Installation
 
+Informix Client SDK Developer Edition for Linux x86_64, 64-bit
 Client SDK version used
 
+Link: https://www.ibm.com/resources/mrs/assets/packageList?source=ifxdl&lang=en_US
+
+* Download and
+* Run `sudo ./installclientsdk` -i console
+* Select features 1,2,4,6,7,8,10,12
+
+* Installation path: `/opt/IBM/Informix.4.50.FC12W5`
+
+# Informix Foreign Data Wrapper Setup
+
+## Dependencies
+
+Postgresql dependencies
+
+```shell
+
+$ sudo dnf install postgresql-server-devel
+
 ```
-Informix Client SDK Developer Edition for Linux x86_64, 64-bit
 
-clientsdk.4.10.FC12.LINUX.tar
-```
-
-* Download and run `sudo ./installclientsdk` .
-* Select options 1-10
-* Installation path: `/opt/IBM/Informix_Client-SDK`
-
-# Informix Foreign Data Wrapper setup
+## Setup
 
 * Clone `https://github.com/credativ/informix_fdw.git`
 
-* Install the following packages
-  * yum install libpq5{,-devel}
-  * centos-release-scl
-  * llvm-toolset-7
-* command
-
-* Modify `Makefile` with the path to `pg_config` which is specific to the PostgreSQL 15
-  setup
-
-  from
-  ```
-  PG_CONFIG=pg_config
-  ```
-  to
-  ```
-  PG_CONFIG=/usr/pgsql-15/bin/pg_config
-  ```
-
-This modification will ensure the libraries are installed in the appropriate locations
-for PostgreSQL 15.
-
-* Modify the `Makefile`
-
-
-to move on `Makefile`  was edited
-
-from
-
 ```
-ESQL=esql
+$ cd inforix_fdw
+$ export PATH="/opt/IBM/Informix.4.50.FC12W5/bin:$PATH"
+$ sudo -E INFORMIXDIR=/opt/IBM/Informix.4.50.FC12W5 USE_PGXS=1 make install
 ```
 
-to
+Library should be installed at `/usr/lib64/pgsql/ifx_fdw.so`.
 
-```
-ESQL=${INFORMIXDIR}/bin/esql
-```
+## Configure  library files
 
-`INFORMIXDIR` needs to be set to the location of the Client SDK.
+Create file `/etc/ld.so.conf.d/informix.conf` with content
 
-This modification will ensure the error
-
-```
-Preprocessing Informix ESQL/C sources
-## Only preprocessing, compilation will be performed later
-esql -c ifx_connection.ec
-make: esql: Command not found
-make: *** [ifx_connection.c] Error 127
+```conf
+/opt/IBM/Informix.4.50.FC12W5/lib/
+/opt/IBM/Informix.4.50.FC12W5/lib/esql/
 ```
 
-does not occur.
+Run
 
-Run the installation
-
-```
-  # INFORMIXDIR=/opt/IBM/Informix_Client-SDK/ USE_PGXS=1 make install
+```shell
+# ldconfig
 ```
 
+Verify all libraries are found and `not found` is not returend for any libraries.
 
-### Post installation
-
-There are Informix libraries that need to be properly located so that they can be found
-by `ifx_fdw.so`.
-
-Check the dependencies of the library
-
-```
-  # ldd /usr/pgsql-15/lib/ifx_fdw.so
-
-    linux-vdso.so.1 =>
-    libifsql.so => not found
-    libifasf.so => not found
-    libifgen.so => not found
-    libifos.so => not found
-    libifgls.so =>  not found
-    libpthread.so.0 => /lib64/libpthread.so.0
-    libm.so.6 => /lib64/libm.so.6
-    libdl.so.2 => /lib64/libdl.so.2
-    libcrypt.so.1 => /lib64/libcrypt.so.1
-    libifglx.so => not found
-    libc.so.6 => /lib64/libc.so.6
-    /lib64/ld-linux-x86-64.so.2
-    libfreebl3.so => /lib64/libfreebl3.so
+```shell
+# ldd /usr/lib65/pgsql/ifx_fdw.so
 ```
 
-Configure the missing libraries by creating symlinks into the `/usr/pgsql-15/lib` folder from the respective IBM Client SDK folders
+# Using Foreign Data Wrapper
 
-For example
-
-```
-  # ln -s /opt/IBM/Informix_Client-SDK/lib/libifsql.so /usr/pgsql-15/lib
-```
-
-Running ldd should show that the library is found
+After verifying libraries are linked verify you can create the extension in PostgreSQL
 
 ```
-  # ldd /usr/pgsql-15/lib/ifx_fdw.so
-    linux-vdso.so.1 =>
-    libifsql.so => /usr/pgsql-15/lib/libifsql.so
-    ... truncated ...
-```
-
-After all the libraries are linked and found  you can create the extension in PostgreSQL
-
-```
+  # su - postgres
+  #  psql
   psql> create extension informix_fdw;
+  CREATE EXTENSION
 ```
 
 # Creation of Foreign Database and Table
 
 ## Informix Database
+
+### Docker Container Setup
+
+
+### Database Setup
 
 The test database is called `sales_demo` with the table `customer`.
 
@@ -278,3 +254,4 @@ After all the configurations are properly done query the foreign table
   ```sql
     ALTER SERVER  informix_tcp OPTIONS (set client_locale 'en_US.819');
   ```
+[rocky9]: (https://www.ibm.com/support/pages/informix-client-software-development-kit-client-sdk-and-informix-connect-system-requirements#linux : )
