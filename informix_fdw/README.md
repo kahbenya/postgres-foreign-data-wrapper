@@ -26,40 +26,103 @@ SDK: IBM Informix Client-SDK 4.50.FC12W5 Linux x86 64 bit (ibm.csdk.4.50.12.5.Li
 
 [Workaround for Rocky 9][rocky9] based on Informix version
 
-```
-[The] following system libraries are needed for IBM Informix version 14.10.FC9,
+[Additional] system libraries are needed for IBM Informix version 14.10.FC9,
 14.10.FC10, and 14.10.FC11 to run on Red Hat Linux 9. (This workaround is not
-needed in 14.10.FC11W1 and later). Higher versions of same libraries are
-installed on Red Hat Linux 9. As a workaround, symbolic links to those
-libraries need to be created.
+needed in [IBM Informix] 14.10.FC11W1 and later). Higher versions of same
+libraries are installed on Red Hat Linux 9. As a workaround, symbolic links to
+those libraries need to be created.
 
-      Libraries needed for Informix:
-          libncurses.so.5
-          libtinfo.so.5
+Install ncurses libraries
 
-      Libraries installed on Red Hat Linux 9:
-         libncurses.so.6
-         libtinfo.so.6
-
-      Workaround:
-          Run following commands as root user from /usr/lib64 directory.
-               ln -s libncurses.so.6 libncurses.so.5
-
-               ln -s libtinfo.so.6 libtinfo.so.5
+```shell
+# dnf install ncurses-libs
 ```
 
-**NOTE**: An IBM account is needed to download the Client SDK.
+Informix needs 
+* libncurses.so.5
+* libtinfo.so.5
 
-## Installation
+however, `ncurses-libs` installed on EPEL 9 provides:
+* libncurses.so.6
+* libtinfo.so.6
+
+As a workaround run following commands as `root` 
+
+```shell
+# cd /usr/lib64
+# ln -s libncurses.so.6 libncurses.so.5
+# ln -s libtinfo.so.6 libtinfo.so.5
+```
+
+## Informix Client SDK Developer Edition Installation
+
+> **NOTE**: An IBM account is needed to download the Client SDK.
 
 Informix Client SDK Developer Edition for Linux x86_64, 64-bit
 Client SDK version used
 
 Link: https://www.ibm.com/resources/mrs/assets/packageList?source=ifxdl&lang=en_US
 
-* Download and
-* Run `sudo ./installclientsdk` -i console
-* Select features 1,2,4,6,7,8,10,12
+* Download the SDK 
+* Run 
+
+```shell
+# cd $DOWNLOAD_DIR/ibm.csdk
+# vim installer.properties
+```
+
+* Add the following to `installer.properties`
+
+```conf
+#Response file for Informix Software Bundle installation
+#(C) Copyright IBM(R) Corp. 2010, 2013. All rights reserved.
+#(C) Copyright HCL(R) Corp. 2010, 2013, 2021. All rights reserved.
+
+#Remember to make a copy of this file before editing it.
+
+#Has the license been accepted
+#-----------------------------
+#You must change the value of this variable to TRUE in order to indicate your acceptance of the license terms. Informix software will not be installed unless you accept the license terms.
+LICENSE_ACCEPTED=TRUE
+
+#Installation Location
+#---------------------
+#The installation location, referred to as INFORMIXDIR.
+# (DEFAULT: INFORMIXDIR environment variable if it is set.
+# Otherwise the software is installed in /opt/IBM/Informix_Client-SDK on UNIX, 
+# Linux, and Mac OS X.)
+
+USER_INSTALL_DIR=/opt/IBM/informix/4.50
+
+#Choose ClientSDK Features to Install
+#------------------------------------
+#This will install all Client SDK features (DEFAULT)
+#CHOSEN_FEATURE_LIST=SDK,SDK-CPP,SDK-CPP-DEMO,SDK-ESQL,SDK-ESQL-ACM,SDK-ESQL-DEMO,SDK-LMI,SDK-ODBC,SDK-ODBC-DEMO,GLS,GLS-WEURAM,GLS-EEUR,GLS-JPN,GLS-KOR,GLS-CHN,GLS-OTH,DBA-DBA
+
+#This will install all Client SDK features
+CHOSEN_INSTALL_FEATURE_LIST=SDK,SDK-CPP,SDK-ESQL,SDK-ESQL-ACM,SDK-LMI,SDK-ODBC,GLS,GLS-WEURAM,GLS-EEUR,DBA-DBA
+
+#Typical vs. Custom mode selection. If you want to use typical mode, use the installation application to record a new response file.
+CHOSEN_INSTALL_SET=Custom
+
+# Choose to configure use of OPENSSL, use of GSKit (and install of GSKit)
+#------------------------------------------------------------------------
+# Supported values are GSKIT or OPENSSL
+# Default is GSKIT
+ENCRYPTION_LIBRARY=GSKIT
+
+#Install
+#-------
+-fileOverwrite_/opt/IBM/Informix_Client-SDK/uninstall/uninstall_clientsdk/uninstallclientsdk.lax=Yes
+-fileOverwrite_/opt/IBM/Informix_Client-SDK/uninstall/uninstall_clientsdk/ids_unlink.xsl=Yes
+-fileOverwrite_/opt/IBM/Informix_Client-SDK/tmp/csdk_chgownergroup.xsl=Yes
+```
+
+Run the installation 
+
+```shell
+# sudo ./installclientsdk -i silent
+```
 
 * Installation path: `/opt/IBM/Informix.4.50.FC12W5`
 
@@ -67,7 +130,7 @@ Link: https://www.ibm.com/resources/mrs/assets/packageList?source=ifxdl&lang=en_
 
 ## Dependencies
 
-Postgresql dependencies
+Install Postgresql dependencies
 
 ```shell
 
@@ -75,11 +138,12 @@ $ sudo dnf install postgresql-server-devel
 
 ```
 
-## Setup
+## Setup Foreign Data Wrapper
 
-* Clone `https://github.com/credativ/informix_fdw.git`
+Clone `https://github.com/credativ/informix_fdw.git`
 
 ```
+$ git clone https://github.com/credativ/informix_fdw.git
 $ cd inforix_fdw
 $ export PATH="/opt/IBM/Informix.4.50.FC12W5/bin:$PATH"
 $ sudo -E INFORMIXDIR=/opt/IBM/Informix.4.50.FC12W5 USE_PGXS=1 make install
@@ -87,7 +151,7 @@ $ sudo -E INFORMIXDIR=/opt/IBM/Informix.4.50.FC12W5 USE_PGXS=1 make install
 
 Library should be installed at `/usr/lib64/pgsql/ifx_fdw.so`.
 
-## Configure  library files
+## Configure library files
 
 Create file `/etc/ld.so.conf.d/informix.conf` with content
 
@@ -102,19 +166,21 @@ Run
 # ldconfig
 ```
 
-Verify all libraries are found and `not found` is not returend for any libraries.
+Verify all libraries are found and `not found` is not returned for any libraries.
 
 ```shell
-# ldd /usr/lib65/pgsql/ifx_fdw.so
+# ldd /usr/lib64/pgsql/ifx_fdw.so
 ```
+
+At this point the foreign data wrapper is installed an useable in PosgresSQL.
 
 # Using Foreign Data Wrapper
 
 After verifying libraries are linked verify you can create the extension in PostgreSQL
 
-```
+```shell
   # su - postgres
-  #  psql
+  # psql
   psql> create extension informix_fdw;
   CREATE EXTENSION
 ```
@@ -125,11 +191,9 @@ After verifying libraries are linked verify you can create the extension in Post
 
 ### Docker Container Setup
 
-
 ### Database Setup
 
 The test database is called `sales_demo` with the table `customer`.
-
 
 ```
   # dbschema -d sales_demo
